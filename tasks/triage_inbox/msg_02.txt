@@ -1,0 +1,4 @@
+Subject: Checkout returns error 500 with any coupon
+
+Since this morning's release, applying any coupon at checkout shows a 500 error.
+No customer can complete an order with a coupon. Steps: add item, enter SAVE10, click Pay.

@@ -1,0 +1,3 @@
+Subject: Typo on the About page
+
+The About page says 'Our misson' instead of 'Our mission'. Small thing.
