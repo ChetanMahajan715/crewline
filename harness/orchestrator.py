@@ -27,7 +27,9 @@ async def with_retries(run: Run, name: str, attempt):
             raise
         except Exception as error:
             reason = f"{type(error).__name__}: {error}"
-            if number == len(delays):
+            # HTTP 4xx errors (except 408 timeout, 429 rate limit) are permanent: fail at once.
+            permanent = 400 <= getattr(error, "status_code", 0) < 500 and error.status_code not in (408, 429)
+            if number == len(delays) or permanent:
                 run.log(name, "error", status="error", output=f"gave up after {number + 1} attempts: {reason}")
                 raise
             run.log(name, "retry", status="retry", output=f"attempt {number + 1} failed ({reason}), retry in {delays[number]}s")
@@ -111,9 +113,11 @@ async def run_task(task: dict, strict_checker: bool = False, fail_agent: str | N
                 stopped = outcome.limit
             if isinstance(outcome, BaseException):
                 reasons[subtask.id] = f"{type(outcome).__name__}: {outcome}"
-                run.save_subtask(subtask.id, subtask.role, "failed" if subtask.id not in done else "unverified", 0)
-                if subtask.id in done:
-                    run.notes.append(f"{subtask.id}: unverified, checker did not finish ({reasons[subtask.id]})")
+                finished = done.get(subtask.id)
+                run.save_subtask(subtask.id, subtask.role, "unverified" if finished else "failed", 0,
+                                 finished.model_dump_json() if finished else reasons[subtask.id])
+                if finished:
+                    run.notes.append(f"{subtask.id}: unverified, stopped before the checker accepted ({reasons[subtask.id]})")
     except BudgetExceeded as error:
         stopped = error.limit
 
@@ -129,8 +133,13 @@ async def run_task(task: dict, strict_checker: bool = False, fail_agent: str | N
 
 
 # Combine findings from all specialists: drop duplicates, put high severity first.
+# A duplicate has the same file and line plus the same label or title. Findings without a
+# line (triage) only match on label, so one file can hold a category, a priority and facts.
 def merge(results: list[WorkerResult]) -> list[Finding]:
-    unique = {}
-    for finding in (f for r in results for f in r.findings):
-        unique.setdefault((finding.file, finding.line, finding.label), finding)
-    return sorted(unique.values(), key=lambda f: SEVERITY_ORDER[f.severity])
+    seen, unique = set(), []
+    for f in (f for r in results for f in r.findings):
+        keys = {(f.file, f.line, f.label)} | ({(f.file, f.line, f.title.lower())} if f.line is not None else set())
+        if not keys & seen:
+            unique.append(f)
+        seen |= keys
+    return sorted(unique, key=lambda f: SEVERITY_ORDER[f.severity])

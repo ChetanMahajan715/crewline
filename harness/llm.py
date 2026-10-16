@@ -70,6 +70,8 @@ async def _mock_reply(system: str, messages: list[dict], agent_name: str) -> tup
     queue = MOCK_SCRIPT.get(agent_name)
     if queue:
         reply = queue.pop(0)
+        if isinstance(reply, Exception):  # lets tests simulate API errors
+            raise reply
         text = reply if isinstance(reply, str) else json.dumps(reply)
     elif agent_name == "lead":
         # Default lead: one subtask per role named on the "Roles:" line of its task.

@@ -93,6 +93,10 @@ async def test_time_limit_stops_cleanly():
     report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent), limits={"max_seconds": 0.45})
     assert report.status == "STOPPED: run seconds"
     assert report.findings and report.findings[0].title == "Hardcoded password"
+    # Shared state agrees with the report: the finished work is saved, labelled unverified.
+    from harness import state
+    row = state.connect().execute("SELECT status, result FROM subtasks WHERE subtask_id = 'security'").fetchone()
+    assert row[0] == "unverified" and "Hardcoded password" in row[1]
 
 
 # Token limit: the lead's first call uses up the tokens, so the run stops before any specialist.
@@ -127,6 +131,27 @@ async def test_timeout_triggers_retry(monkeypatch):
     retries = [e for e in trace(report) if e["event_type"] == "retry" and e["agent"] == "quality"]
     assert len(retries) == 3 and "TimeoutError" in retries[0]["output"]
     assert report.status == "PARTIAL"
+
+
+# Two specialists reporting the same bug under different labels count as one finding.
+def test_merge_drops_same_bug_with_different_label():
+    from harness.orchestrator import merge
+    from harness.schemas import Finding, WorkerResult
+    a, b = Finding(**FINDING), Finding(**{**FINDING, "label": "secret_in_code", "title": "hardcoded PASSWORD"})
+    assert len(merge([WorkerResult(findings=[a]), WorkerResult(findings=[b])])) == 1
+
+
+# A permanent API error (like HTTP 403 "model not in your tier") is not retried: retrying cannot help.
+async def test_permanent_api_error_not_retried():
+    from harness import orchestrator
+
+    class Forbidden(Exception):
+        status_code = 403
+
+    llm.MOCK_SCRIPT["security"] = [Forbidden("model not available in your tier")]
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent))
+    assert not [e for e in trace(report) if e["event_type"] == "retry" and e["agent"] == "security"]
+    assert report.status == "PARTIAL" and "Forbidden" in report.missing[0]
 
 
 # The lead only has list_files; asking for read_file is blocked and logged.
