@@ -83,3 +83,47 @@ async def test_checker_loop_capped():
     assert len(security_starts) == 1 + config.MAX_CHECKER_LOOPS
     assert "Checker feedback" in security_starts[1]["input"]
     assert any("unverified" in note for note in report.notes) and report.status == "COMPLETE"
+
+
+# Run time limit: the run stops with STOPPED and still returns the work already finished.
+async def test_time_limit_stops_cleanly():
+    from harness import orchestrator
+    llm.MOCK_DELAY_SECONDS = 0.3
+    llm.MOCK_SCRIPT["security"] = [{"final": {"findings": [FINDING]}}]
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent), limits={"max_seconds": 0.45})
+    assert report.status == "STOPPED: run seconds"
+    assert report.findings and report.findings[0].title == "Hardcoded password"
+
+
+# Token limit: the lead's first call uses up the tokens, so the run stops before any specialist.
+async def test_token_limit_stops_cleanly():
+    from harness import orchestrator
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent), limits={"max_tokens": 1})
+    assert report.status == "STOPPED: run tokens"
+    assert len(report.missing) == 3 and trace(report)[-1]["event_type"] == "run_end"
+
+
+# Step limit: lead plus specialists use the steps; the checkers are stopped.
+async def test_step_limit_stops_cleanly():
+    from harness import orchestrator
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent), limits={"max_steps": 2})
+    assert report.status == "STOPPED: run steps"
+
+
+# An agent that always fails is retried 3 times with growing waits, then the run is PARTIAL.
+async def test_retry_with_backoff_then_partial():
+    from harness import orchestrator
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent), fail_agent="security")
+    retries = [e["output"] for e in trace(report) if e["event_type"] == "retry" and e["agent"] == "security"]
+    assert [r.split("retry in ")[1] for r in retries] == ["0.01s", "0.02s", "0.04s"]
+    assert report.status == "PARTIAL" and report.missing[0].startswith("security")
+
+
+# An agent slower than the timeout is cancelled and retried.
+async def test_timeout_triggers_retry(monkeypatch):
+    from harness import orchestrator
+    monkeypatch.setattr(config, "AGENT_TIMEOUT_SECONDS", 0.05)
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent), slow_agent="quality")
+    retries = [e for e in trace(report) if e["event_type"] == "retry" and e["agent"] == "quality"]
+    assert len(retries) == 3 and "TimeoutError" in retries[0]["output"]
+    assert report.status == "PARTIAL"

@@ -1,11 +1,11 @@
 # Runs a task with the team: the lead plans, the specialists work in parallel, the checker
-# accepts or sends work back, and the results are merged into one FinalReport.
-# Roles, prompts and tools all come from the task profile in config.
+# accepts or sends work back, and the results are merged into one FinalReport labelled
+# COMPLETE, PARTIAL or STOPPED. Roles, prompts and tools come from the task profile in config.
 import asyncio
 
 from harness import config, tools
 from harness.agents import run_agent
-from harness.budget import Budget
+from harness.budget import Budget, BudgetExceeded
 from harness.schemas import CheckerVerdict, FinalReport, Finding, Plan, Subtask, WorkerResult
 from harness.state import Run
 
@@ -17,54 +17,113 @@ def system_prompt(role: str, allowed: list[str], instructions: str) -> str:
     return config.BASE_PROMPT.format(role=role, tools=", ".join(allowed) or "none") + "\n" + instructions
 
 
-# Run one task end to end and return the final report.
-async def run_task(task: dict, strict_checker: bool = False) -> FinalReport:
+# Try `attempt` with a timeout; on failure wait 1 s, 2 s, 4 s and try again. Budgets are not retried.
+async def with_retries(run: Run, name: str, attempt):
+    delays = config.BACKOFF_SECONDS
+    for number in range(len(delays) + 1):
+        try:
+            return await asyncio.wait_for(attempt(), config.AGENT_TIMEOUT_SECONDS)
+        except BudgetExceeded:
+            raise
+        except Exception as error:
+            reason = f"{type(error).__name__}: {error}"
+            if number == len(delays):
+                run.log(name, "error", status="error", output=f"gave up after {number + 1} attempts: {reason}")
+                raise
+            run.log(name, "retry", status="retry", output=f"attempt {number + 1} failed ({reason}), retry in {delays[number]}s")
+            await asyncio.sleep(delays[number])
+
+
+# Run one task end to end and return the final report. The flags simulate failures for demos/tests.
+async def run_task(task: dict, strict_checker: bool = False, fail_agent: str | None = None,
+                   slow_agent: str | None = None, limits: dict | None = None) -> FinalReport:
     profile = config.PROFILES[task["profile"]]
     run = Run(task["id"], config.ROOT / task["folder"], "multi")
-    run_budget = Budget("run", **config.RUN_LIMITS)
+    run_budget = Budget("run", **{**config.RUN_LIMITS, **(limits or {})})
+    run.log("harness", "run_start", input=task)
     files = ", ".join(tools.list_files(run))
     roles = list(profile["specialists"])
+    done: dict[str, WorkerResult] = {}  # finished specialist work, kept even if the run stops later
+    reasons: dict[str, str] = {}  # why a subtask is missing
+    stopped = None
 
-    # 1. The lead looks at the folder and writes one subtask per specialist.
-    lead_task = f"Goal: {task['goal']}\nRoles: {', '.join(roles)}"
-    plan = await run_agent(run, "lead", system_prompt("lead", profile["lead_tools"], config.LEAD_PROMPT),
-                           lead_task, profile["lead_tools"], [run_budget, Budget("lead", **config.AGENT_LIMITS)], Plan)
-
-    # 2. One specialist works on one subtask; the checker accepts it or sends it back.
-    async def work_on(subtask: Subtask) -> WorkerResult:
+    # One specialist works on one subtask; the checker accepts it or sends it back.
+    async def work_on(subtask: Subtask) -> None:
         spec = profile["specialists"][subtask.role]
         system = system_prompt(subtask.role, spec["tools"], spec["prompt"] + "\n" + config.FINDING_FORMAT)
+        checker = f"checker:{subtask.role}"
         checker_system = system_prompt("checker", profile["checker_tools"], config.CHECKER_PROMPT)
         worker_budget = Budget(subtask.role, **config.AGENT_LIMITS)
-        checker_budget = Budget(f"checker:{subtask.role}", **config.AGENT_LIMITS)
+        checker_budget = Budget(checker, **config.AGENT_LIMITS)
         feedback = ""
-        for loop in range(config.MAX_CHECKER_LOOPS + 1):
+
+        # One attempt by the specialist, including the simulated failures.
+        async def specialist_attempt() -> WorkerResult:
+            if subtask.role == fail_agent:
+                raise RuntimeError("simulated failure (--fail-agent)")
+            if subtask.role == slow_agent:
+                await asyncio.sleep(config.AGENT_TIMEOUT_SECONDS + 1)
             work = f"Goal: {task['goal']}\nSubtask: {subtask.instructions}\nFiles in the folder: {files}"
             if feedback:
                 work += f"\nChecker feedback on your last answer: {feedback}"
-            result = await run_agent(run, subtask.role, system, work, spec["tools"], [run_budget, worker_budget], WorkerResult)
-            result.subtask_id = subtask.id
+            return await run_agent(run, subtask.role, system, work, spec["tools"], [run_budget, worker_budget], WorkerResult)
+
+        for loop in range(config.MAX_CHECKER_LOOPS + 1):
+            result = await with_retries(run, subtask.role, specialist_attempt)
+            result.subtask_id, result.status = subtask.id, "unverified"  # unverified until the checker accepts
+            done[subtask.id] = result
             check = f"Subtask: {subtask.instructions}\nFindings to check:\n{result.model_dump_json()}"
-            verdict = await run_agent(run, f"checker:{subtask.role}", checker_system, check, profile["checker_tools"],
-                                      [run_budget, checker_budget], CheckerVerdict)
+            verdict = await with_retries(run, checker, lambda: run_agent(
+                run, checker, checker_system, check, profile["checker_tools"], [run_budget, checker_budget], CheckerVerdict))
             if strict_checker:  # test flag: the checker rejects everything
                 verdict.accept = False
-            run.log(f"checker:{subtask.role}", "verdict", status="ok" if verdict.accept else "rejected", output=verdict.feedback)
+            run.log(checker, "verdict", status="ok" if verdict.accept else "rejected", output=verdict.feedback)
             if verdict.accept:
+                result.status = "ok"
                 break
             feedback = verdict.feedback
         else:
-            # Loop cap hit: keep the work but label it unverified.
-            result.status = "unverified"
             run.notes.append(f"{subtask.id}: unverified, checker still rejected after {config.MAX_CHECKER_LOOPS} revisions")
         run.save_subtask(subtask.id, subtask.role, result.status, loop + 1, result.model_dump_json())
-        return result
 
-    # 3. All specialists run at the same time; their results are gathered.
-    results = await asyncio.gather(*(work_on(s) for s in plan.subtasks))
+    try:
+        # 1. The lead looks at the folder and plans. If it fails, use a default plan.
+        lead_task = f"Goal: {task['goal']}\nRoles: {', '.join(roles)}"
+        lead_system = system_prompt("lead", profile["lead_tools"], config.LEAD_PROMPT)
+        lead_budget = Budget("lead", **config.AGENT_LIMITS)
+        try:
+            plan = await with_retries(run, "lead", lambda: run_agent(
+                run, "lead", lead_system, lead_task, profile["lead_tools"], [run_budget, lead_budget], Plan))
+        except BudgetExceeded:
+            raise
+        except Exception:
+            plan = Plan(subtasks=[])
+            run.notes.append("lead failed, used the default plan")
+        # Exactly one subtask per profile role, whatever the lead returned.
+        by_role = {s.role: s for s in plan.subtasks if s.role in roles}
+        subtasks = [Subtask(id=r, role=r, instructions=by_role[r].instructions if r in by_role else f"Do the {r} job.")
+                    for r in roles]
 
-    # 4. Merge everything into one report.
-    report = FinalReport(run_id=run.run_id, status="COMPLETE", findings=merge(results), notes=run.notes)
+        # 2. All specialists run at the same time; failures come back as exceptions, not crashes.
+        outcomes = await asyncio.gather(*(work_on(s) for s in subtasks), return_exceptions=True)
+        for subtask, outcome in zip(subtasks, outcomes):
+            if isinstance(outcome, BudgetExceeded) and outcome.limit.startswith("run "):
+                stopped = outcome.limit
+            if isinstance(outcome, BaseException):
+                reasons[subtask.id] = f"{type(outcome).__name__}: {outcome}"
+                run.save_subtask(subtask.id, subtask.role, "failed" if subtask.id not in done else "unverified", 0)
+                if subtask.id in done:
+                    run.notes.append(f"{subtask.id}: unverified, checker did not finish ({reasons[subtask.id]})")
+    except BudgetExceeded as error:
+        stopped = error.limit
+
+    # 3. Merge what finished and label the run honestly.
+    if stopped:
+        run.log("harness", "budget_stop", status="error", output=stopped)
+    missing = [f"{role}: {reasons.get(role, 'not started, run stopped')}" for role in roles if role not in done]
+    status = f"STOPPED: {stopped}" if stopped else "PARTIAL" if missing else "COMPLETE"
+    report = FinalReport(run_id=run.run_id, status=status, findings=merge(list(done.values())),
+                         missing=missing, notes=run.notes)
     run.finish(report.status, report.model_dump_json())
     return report
 
