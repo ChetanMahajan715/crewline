@@ -62,3 +62,24 @@ async def test_happy_path_report_state_and_trace():
     assert any(e["event_type"] == "tool_call" and e["tool"] == "read_file" for e in events)
     row = state.connect().execute("SELECT status FROM runs WHERE run_id = ?", (report.run_id,)).fetchone()
     assert row == ("COMPLETE",)
+
+
+# Specialists run at the same time: every one starts before any one finishes.
+async def test_workers_run_in_parallel():
+    from harness import orchestrator
+    llm.MOCK_DELAY_SECONDS = 0.2
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent))
+    events = trace(report)
+    starts = [e["ts"] for e in events if e["event_type"] == "agent_start" and e["agent"] in ("security", "quality", "docs")]
+    ends = [e["ts"] for e in events if e["event_type"] == "agent_end" and e["agent"] in ("security", "quality", "docs")]
+    assert len(starts) == 3 and max(starts) < min(ends)
+
+
+# A checker that always rejects: work goes back with feedback, at most 2 times, then "unverified".
+async def test_checker_loop_capped():
+    from harness import orchestrator
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent), strict_checker=True)
+    security_starts = [e for e in trace(report) if e["event_type"] == "agent_start" and e["agent"] == "security"]
+    assert len(security_starts) == 1 + config.MAX_CHECKER_LOOPS
+    assert "Checker feedback" in security_starts[1]["input"]
+    assert any("unverified" in note for note in report.notes) and report.status == "COMPLETE"
