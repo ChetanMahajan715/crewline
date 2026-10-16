@@ -1,4 +1,4 @@
-# OpenAI-compatible client, used to talk to Mistral (or any compatible provider)
+# OpenAI-compatible HTTP client. Talks to Mistral via base_url; nothing is sent to OpenAI
 openai==3.31.0
 # Validates the JSON messages agents pass to each other
 pydantic==2.14.1

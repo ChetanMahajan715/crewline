@@ -1,6 +1,7 @@
 # All settings for agent-harness live in this one file: model, limits, retries, prices,
 # and the task profiles (roles, prompts, tool permissions). Change a value here and the
 # next run uses it. Other files read these as `config.NAME` so tests can override them.
+import os
 from pathlib import Path
 
 # Folders. The sandbox is the ONLY place agents may write without asking a human.
@@ -15,6 +16,13 @@ BASE_URL = "https://api.mistral.ai/v1"
 MODEL = "mistral-large-2512"  # backup: "codestral-2508"
 API_KEY_ENV = "MISTRAL_API_KEY"
 PROVIDER = "mistral"  # "mistral" (any OpenAI-compatible API) or "mock" (offline, scripted)
+
+# Load KEY=value lines from .env (never committed) unless the variable is already set.
+if (ROOT / ".env").exists():
+    for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.partition("=")
+        if sep and not line.startswith("#") and value.strip():
+            os.environ.setdefault(key.strip(), value.strip().strip('"'))
 
 # Rate limit care: free tier allows about 1 request per second.
 MIN_SECONDS_BETWEEN_CALLS = 1.1
