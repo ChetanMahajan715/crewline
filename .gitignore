@@ -1,0 +1,7 @@
+.venv/
+.env
+sandbox/repos/
+sandbox/*.txt
+__pycache__/
+*.db
+.pytest_cache/

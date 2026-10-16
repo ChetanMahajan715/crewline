@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- agent-harness mark: one lead node feeding three worker nodes, inside a rounded frame (the harness) -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#0F172A"/>
+  <g stroke="#14B8A6" stroke-width="3" stroke-linecap="round">
+    <line x1="32" y1="20" x2="16" y2="42"/>
+    <line x1="32" y1="20" x2="32" y2="42"/>
+    <line x1="32" y1="20" x2="48" y2="42"/>
+  </g>
+  <circle cx="32" cy="18" r="7" fill="#14B8A6"/>
+  <circle cx="16" cy="44" r="5" fill="#F8FAFC"/>
+  <circle cx="32" cy="44" r="5" fill="#F8FAFC"/>
+  <circle cx="48" cy="44" r="5" fill="#F8FAFC"/>
+</svg>
