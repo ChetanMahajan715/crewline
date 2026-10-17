@@ -43,6 +43,8 @@ This guide takes you from a fresh clone to running and testing every feature you
 - [ ] Done
 
 ### Step 1.2: Download the project
+**Already have the project folder on your computer?** Skip this step: open PowerShell in that folder and go to step 1.3.
+
 **Do:**
 ```powershell
 git clone https://github.com/ChetanMahajan715/agent-harness.git
