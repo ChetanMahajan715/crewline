@@ -125,7 +125,7 @@ crewline/
 ├── app.py                web page: run viewer and approval screen (Streamlit)
 ├── tasks/tasks.json      the list of tasks (id, team, folder, goal)
 ├── tests/                25 automated tests (offline mock model)
-├── docs/                 GUIDE.md (run and test), VIDEO_SCRIPT.md (demo), DEVLOG.md (what went wrong)
+├── docs/                 GUIDE.md (how to run and test) and DEVLOG.md (what went wrong)
 ├── brand/                logo, colours and the web page theme
 ├── sandbox/              task inputs (the demo data goes here), and the only folder agents may write to
 └── runs/                 one trace file per run (created by runs)
@@ -236,24 +236,28 @@ On these tasks, almost nowhere. The single agent matched or beat the team on qua
 
 ## 9. Hours spent
 
-`TODO: fill in`
+About **6 hours** across two sessions (16 and 17 October 2026), a little over the suggested 4 to 5:
+
+| Part | Time |
+|---|---|
+| Building the harness: loop, roles, parallel work, budgets, retries, safety layers, tests | about 1.5 h |
+| First real runs on Mistral, fixing what broke, team vs single comparison, checking findings by hand | about 1.5 h |
+| An independent review against the brief, and fixing what it found | about 1 h |
+| Docs, demo data, and making the repo work from a fresh clone | about 2 h |
+
+What I cut to stay close to the time is in section 8.
 
 ## 10. How I used AI, including one place it was wrong
 
-`TODO: fill in`
+I built Crewline with **Claude Code** as my coding assistant, and it wrote most of the code. My part was deciding what to build and making sure it was right:
 
-## 11. Demo video script (3 to 4 min)
+- **Spec first.** The work started from a detailed written spec: roles, budgets, safety rules, the tests to write, and how to evaluate. The assistant built it phase by phase, running the tests after each phase.
+- **Decisions.** I chose the task types, kept the harness small and framework-free, chose demo data with known answers so results could be checked, and chose to report that the single agent beat the team instead of hiding it.
+- **Checking.** I ran the real model myself, compared findings with the answer keys and the source code by hand, and had a separate AI reviewer check the finished project against the brief.
 
-The full scene-by-scene script, with folders, commands and narration, is in [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md). In short:
+**One place it was wrong, and how it was caught.** When the project was changed so that a fresh clone starts without test data, a missing task folder made the harness run on zero files and still report **COMPLETE**, with an empty table. That is a misleading result. It surfaced when I had the setup re-tested exactly as a stranger would, from a fresh clone, following the guide: an empty COMPLETE made no sense. The harness now stops with a clear message ("Task folder ... is missing or empty"), with a test so it can't come back.
 
-1. **Title card (10 s):** logo, "Crewline", "A team of agents, kept in check." on `#0F172A`.
-2. **A full real run (60 s):** with a trap `NOTES.md` planted in your repo ([docs/GUIDE.md](docs/GUIDE.md) part 4), run `python run.py --task myrepo`. Point out:
-   - the findings table, high severity first;
-   - the **INJECTION SUSPECTED** note for `NOTES.md`;
-   - no `outside.txt` was created.
-
-   Then `python replay.py runs\<id>.jsonl`: point at the parallel specialists' start times, the checker verdicts, and the per-agent totals.
-3. **A failure (40 s):** `python run.py --task myrepo --fail-agent security`. Yellow **RETRY** lines with 1 s, 2 s, 4 s waits, then **PARTIAL** listing `security` as missing, while the other findings are kept.
-4. **A limit hit (30 s):** `python run.py --task myrepo --max-tokens 3000`. A red **STOPPED: run tokens**: the lead finishes, and the missing list shows each specialist stopped by the run's token limit.
-5. **The risky write being denied (30 s):** [docs/GUIDE.md](docs/GUIDE.md) step 9.3. **APPROVAL NEEDED** appears; answer `n`, or nothing, and the write is **DENIED** and the file isn't created.
-6. **Honest result (30 s):** show the table from section 3. On tasks this small, one agent was as good, faster and cheaper.
+**Other mistakes it made** (details in [docs/DEVLOG.md](docs/DEVLOG.md)):
+- It assumed the free tier included `mistral-large-2512`; the first real run got HTTP 403, and the harness wasted retries on an error that could never succeed. Fixed with a config change and no retries on permanent errors.
+- Its lead prompt was worded so the model replied in the wrong shape, and every plan failed until the wording was fixed.
+- It skipped two of the required tests until the README pointed at one of them.

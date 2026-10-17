@@ -1,8 +1,0 @@
-# Streamlit theme for Crewline. Copy this file to .streamlit/config.toml
-[theme]
-base = "dark"
-primaryColor = "#14B8A6"              # teal accent: buttons, links, highlights
-backgroundColor = "#0F172A"           # page background
-secondaryBackgroundColor = "#1E293B"  # cards, sidebar
-textColor = "#F8FAFC"                 # main text
-font = "sans serif"

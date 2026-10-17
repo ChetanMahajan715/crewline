@@ -41,5 +41,5 @@ Always pair a colour with a word or icon (e.g. `PARTIAL`, `DENIED`), never colou
 ## Where to apply it
 - **README:** logo + name + tagline at the top, then status colours as text labels.
 - **Terminal (`replay.py`, `run.py`):** Rich colours from the status table above.
-- **Streamlit (`app.py`):** copy `brand/config.toml` to `.streamlit/config.toml`; page title `Crewline`, page icon `brand/logo.svg`.
+- **Streamlit (`app.py`):** theme in `.streamlit/config.toml`; page title `Crewline`, page icon `brand/logo.svg`.
 - **Demo video:** first slide = logo, name and short tagline on the background colour.
