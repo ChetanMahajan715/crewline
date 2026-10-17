@@ -1,6 +1,6 @@
 # Command line entry point for agent-harness: run one task from tasks/tasks.json with the team
 # (or the single-agent baseline) and print the final report. The test flags simulate failures.
-# Example: python run.py --task fixture_repo --provider mock
+# Example: python run.py --task myrepo --provider mock   (add tasks in tasks/tasks.json first)
 import argparse
 import asyncio
 import json
@@ -20,6 +20,8 @@ console = Console()
 # A wrong id or an empty folder stops with a clear message instead of a confusing result.
 def load_task(task_id: str) -> dict:
     tasks = {t["id"]: t for t in json.loads(config.TASKS_FILE.read_text(encoding="utf-8"))}
+    if not tasks:
+        raise SystemExit("tasks/tasks.json has no tasks yet. Add one first: see docs/GUIDE.md, part 2.")
     if task_id not in tasks:
         raise SystemExit(f"Unknown task '{task_id}'. Available tasks: {', '.join(tasks)}")
     task = tasks[task_id]

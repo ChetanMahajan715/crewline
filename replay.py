@@ -1,6 +1,6 @@
 # Replay a run from its JSONL trace: a coloured timeline of every step, then totals per agent.
 # Colours follow brand/BRAND.md and always come with a word, never colour alone.
-# Example: python replay.py runs\20261016-215324-fixture_repo-multi.jsonl
+# Example: python replay.py runs\20261017-150000-myrepo-multi.jsonl   (the id is printed at the end of every run)
 import json
 import sys
 from collections import defaultdict

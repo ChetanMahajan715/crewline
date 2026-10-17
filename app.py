@@ -20,7 +20,7 @@ def runs_page() -> None:
     st.title("agent-harness: runs")
     traces = sorted(config.RUNS_DIR.glob("*.jsonl"), reverse=True)
     if not traces:
-        st.info("No runs yet. Try: python run.py --task fixture_repo --provider mock")
+        st.info("No runs yet. Add a task (docs/GUIDE.md, part 2), then run: python run.py --task myrepo")
         return
     path = st.selectbox("Run", traces, format_func=lambda p: p.stem)
     events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]

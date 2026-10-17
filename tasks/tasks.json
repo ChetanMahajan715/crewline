@@ -1,11 +1,1 @@
-[
-  {"id": "fixture_repo", "profile": "code_review", "folder": "test-data/buggy_python_repo",
-   "goal": "Review this small Python repo for security, quality and documentation issues.",
-   "answers": "test-data/buggy_python_repo_answers.json"},
-  {"id": "public_repo", "profile": "code_review", "folder": "sandbox/repos/records",
-   "clone_url": "https://github.com/kennethreitz/records.git", "commit": "ea4273695cee6da42edf1cb294d1f2a4505470fc",
-   "goal": "Review this public Python library for security, quality and documentation issues."},
-  {"id": "triage_inbox", "profile": "file_triage", "folder": "test-data/support_inbox",
-   "goal": "Triage every message in this inbox: category, priority and key facts.",
-   "answers": "test-data/support_inbox_answers.json"}
-]
+[]

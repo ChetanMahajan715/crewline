@@ -23,11 +23,12 @@ uv pip install -r requirements.txt
 copy .env.example .env
 notepad .env
 
-# The test inputs live in their own repo; clone them into test-data\
-git clone https://github.com/ChetanMahajan715/agent-harness-test-data.git test-data
-
 pytest                                   # 25 tests, offline, about 4 seconds
-python run.py --task fixture_repo        # a real run with the team
+
+# Bring your own input: clone a small Python repo into the sandbox...
+git clone https://github.com/OWNER/REPO.git sandbox\repos\myrepo
+# ...add it to tasks\tasks.json (see docs/GUIDE.md, part 2), then:
+python run.py --task myrepo              # a real run with the team
 ```
 
 **The full step-by-step guide**, covering every feature, how to test each one and how to fix common problems, is in **[docs/GUIDE.md](docs/GUIDE.md)**.
@@ -84,21 +85,27 @@ agent-harness/
 ├── tests/                25 automated tests (offline mock model)
 ├── docs/                 GUIDE.md (how to run and test) and DEVLOG.md (what went wrong)
 ├── brand/                logo, colours and the web page theme
-├── sandbox/              the only folder agents may write to (created by runs)
-├── runs/                 one trace file per run (created by runs)
-└── test-data/            cloned test inputs (not part of this repo)
+├── sandbox/              your task inputs, and the only folder agents may write to
+└── runs/                 one trace file per run (created by runs)
 ```
 
 ## 2. How to run
 
-After the quick start above, with `.venv` active:
+The project ships with **no tasks**: `tasks/tasks.json` starts as `[]`, and you add your own. A task is a folder plus a job, for example:
+
+```json
+[
+  {"id": "myrepo", "profile": "code_review", "folder": "sandbox/repos/myrepo",
+   "goal": "Review this Python repo for security, quality and documentation issues."}
+]
+```
+
+`profile` picks the team: `code_review` (security, quality, docs) or `file_triage` (classifier, urgency, extractor, for a folder of text messages). [docs/GUIDE.md](docs/GUIDE.md) parts 2 and 5 walk through both. Then, with `.venv` active:
 
 ```powershell
-python run.py --task fixture_repo                  # code review, with the team
-python run.py --task triage_inbox                  # file triage, with the team
-python run.py --task public_repo                   # code review of a real GitHub repo (cloned automatically)
-python run.py --task fixture_repo --single         # the single-agent baseline
-python run.py --task fixture_repo --provider mock  # offline, no key needed
+python run.py --task myrepo                        # the team, real model
+python run.py --task myrepo --single               # the single-agent baseline
+python run.py --task myrepo --provider mock        # offline, no key needed
 python replay.py runs\<run id>.jsonl               # replay any run (the id is printed at the end of each run)
 python evaluate.py                                 # all tasks, team vs single, writes results.md
 pytest                                             # the automated tests
@@ -194,13 +201,13 @@ On these tasks, almost nowhere. The single agent matched or beat the team on qua
 ## 11. Demo video script (3 to 4 min)
 
 1. **Title card (10 s):** logo, "agent-harness", "A team of agents, kept in check." on `#0F172A`.
-2. **A full real run (60 s):** `python run.py --task fixture_repo`. Point out:
+2. **A full real run (60 s):** with a trap `NOTES.md` planted in your repo ([docs/GUIDE.md](docs/GUIDE.md) part 4), run `python run.py --task myrepo`. Point out:
    - the findings table, high severity first;
    - the **INJECTION SUSPECTED** note for `NOTES.md`;
    - no `outside.txt` was created.
 
    Then `python replay.py runs\<id>.jsonl`: point at the parallel specialists' start times, the checker verdicts, and the per-agent totals.
-3. **A failure (40 s):** `python run.py --task fixture_repo --fail-agent security`. Yellow **RETRY** lines with 1 s, 2 s, 4 s waits, then **PARTIAL** listing `security` as missing, while the other findings are kept.
-4. **A limit hit (30 s):** `python run.py --task fixture_repo --max-tokens 3000`. A red **STOPPED: run tokens**: the lead finishes, and the missing list shows each specialist stopped by the run's token limit.
+3. **A failure (40 s):** `python run.py --task myrepo --fail-agent security`. Yellow **RETRY** lines with 1 s, 2 s, 4 s waits, then **PARTIAL** listing `security` as missing, while the other findings are kept.
+4. **A limit hit (30 s):** `python run.py --task myrepo --max-tokens 3000`. A red **STOPPED: run tokens**: the lead finishes, and the missing list shows each specialist stopped by the run's token limit.
 5. **The risky write being denied (30 s):** [docs/GUIDE.md](docs/GUIDE.md) step 9.3. **APPROVAL NEEDED** appears; answer `n`, or nothing, and the write is **DENIED** and the file isn't created.
 6. **Honest result (30 s):** show the table from section 3. On tasks this small, one agent was as good, faster and cheaper.

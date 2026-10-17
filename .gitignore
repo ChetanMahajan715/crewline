@@ -14,9 +14,6 @@ runs/*.jsonl
 sandbox/*
 !sandbox/.gitkeep
 
-# Test data is its own repo: git clone it into test-data/ (see docs/GUIDE.md)
-test-data/
-
 # Personal files
 .vscode/
 *.docx
