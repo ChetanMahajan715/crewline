@@ -35,7 +35,8 @@ class Budget:
                 raise BudgetExceeded(f"{self.name} {which}")
 
 
-# Estimated cost in USD at paid prices (the free tier really costs $0).
+# Estimated cost in USD at paid prices (the free tier really costs $0). A model missing from
+# the price table counts as $0, so switching provider never breaks a run.
 def estimate_cost(input_tokens: int, output_tokens: int) -> float:
-    price_in, price_out = config.PRICES["mock" if config.PROVIDER == "mock" else config.MODEL]
+    price_in, price_out = config.PRICES.get("mock" if config.PROVIDER == "mock" else config.MODEL, (0.0, 0.0))
     return round((input_tokens * price_in + output_tokens * price_out) / 1_000_000, 6)

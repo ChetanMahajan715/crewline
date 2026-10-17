@@ -10,3 +10,6 @@ runs/*.jsonl
 !runs/20261016-220223-fixture_repo-multi.jsonl
 !runs/20261016-220338-fixture_repo-single.jsonl
 !runs/20261016-220511-triage_inbox-multi.jsonl
+!runs/20261016-220403-public_repo-multi.jsonl
+!runs/20261016-220443-public_repo-single.jsonl
+!runs/20261016-220622-triage_inbox-single.jsonl

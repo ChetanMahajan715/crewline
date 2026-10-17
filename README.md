@@ -60,7 +60,7 @@ python run.py --task fixture_repo --single         # the single-agent baseline
 python run.py --task triage_inbox --provider mock  # offline, no key needed
 python replay.py runs\20261016-220223-fixture_repo-multi.jsonl
 python evaluate.py                                 # 3 tasks x 2 modes, writes results.md
-pytest                                             # 18 tests, mock provider, about 4 s
+pytest                                             # 21 tests, mock provider, about 4 s
 streamlit run app.py                               # optional: run viewer + approval screen
 ```
 
@@ -85,11 +85,11 @@ All numbers are from real runs with `codestral-2508`, one run per task and mode 
 | triage inbox (10 messages) | team | 9.6 (18/20 labels) | 61 | 53 | 59,253 | 0.0196 |
 | triage inbox (10 messages) | single | **10.0** (20/20 labels) | **30** | 12 | **14,773** | **0.0060** |
 
-The public repo has no answer file, so I checked every finding by hand against the source (details in `results.md`). **Limit of the rubric:** both public-repo runs scored 3.0/3 on evidence, because every quoted line really exists. The evidence check proves a quote is real, not that the claim about it is true.
+The public repo has no answer file, so I checked every finding by hand against the source (details in `results.md`). **Status note:** in the fixture team run, `docs` ran out of its own 15-step budget during a revision. The run printed COMPLETE, and the review in phase 10 caught this. The harness now labels such a run PARTIAL. The scores are unchanged. **Limit of the rubric:** both public-repo runs scored 3.0/3 on evidence, because every quoted line really exists. The evidence check proves a quote is real, not that the claim about it is true.
 
 ## 4. Where multi-agent was NOT worth it
 
-On these tasks, almost nowhere. The single agent matched or beat the team on quality, and was 2 to 4 times faster and 3 to 5 times cheaper in tokens.
+On these tasks, almost nowhere. The single agent matched or beat the team on quality, was 1.7 to 4.3 times faster, and used 1.6 to 5.4 times fewer tokens.
 
 - **The tasks fit in one context.** Five small files or ten short messages don't need to be split up. Splitting means three agents each re-read the same files, and three checkers read them again.
 - **The checker costs a lot and can make results worse.** On the fixture repo it rejected work 3 times. In an earlier run it rejected a correct SQL injection finding and the specialist removed it (DEVLOG entry 3). With this model, the checker adds errors as well as removing them.
@@ -101,7 +101,7 @@ On these tasks, almost nowhere. The single agent matched or beat the team on qua
 Run `runs/20261016-214739-fixture_repo-multi.jsonl` (try `python replay.py` on it):
 
 - **What happened:** every call returned HTTP 403 `tier_not_allowed`. The configured model, `mistral-large-2512`, isn't in this account's free tier.
-- **What the harness did:** the lead failed, so the harness fell back to the default plan. All three specialists failed. The run finished cleanly as **PARTIAL**, listing every missing subtask and the error. But it also retried a permanent error 3 times per agent: 16 useless calls and 25 seconds.
+- **What the harness did:** the lead failed, so the harness fell back to the default plan. All three specialists failed. The run finished cleanly as **PARTIAL**, listing every missing subtask and the error. But it also retried a permanent error 3 times per agent: 16 useless calls and about 23 seconds.
 - **What I changed:**
   - Switched to the backup model with one config line.
   - Made `with_retries` fail immediately on permanent HTTP 4xx errors, while still retrying 408 and 429 (test `test_permanent_api_error_not_retried`).
@@ -119,7 +119,7 @@ Run `runs/20261016-214739-fixture_repo-multi.jsonl` (try `python replay.py` on i
   - every path must stay inside the task folder or `sandbox/`;
   - writing outside `sandbox/` needs a human yes, and no answer means deny.
 
-  `write_file` paths are relative to `sandbox/`. Note that the public repo is cloned inside `sandbox/repos/`, so agents could write there without approval.
+  `write_file` paths are relative to `sandbox/`. Writing into the task's own files always needs approval, even for the public repo cloned inside `sandbox/repos/`. Links (symlinks, junctions) inside a task folder that point outside it are not listed, searched or read.
 - **Mock provider for tests, real model for evaluation.** The tests are fast and deterministic; the results are real.
 - **Free tier, so cost is estimated.** Tokens are the real cost measure. USD comes from the price table in config.
 - **The merge is plain code, not a model call.** Removing duplicates and sorting by severity doesn't need a model, and doing it in code saves tokens.
@@ -162,6 +162,6 @@ Candidates from DEVLOG:
 
    Then `python replay.py runs\<id>.jsonl`: point at the parallel specialists' start times, the checker verdicts, and the per-agent totals.
 3. **A failure (40 s):** `python run.py --task fixture_repo --fail-agent security`. Yellow **RETRY** lines with 1 s, 2 s, 4 s waits, then **PARTIAL** listing `security` as missing, while the other findings are kept.
-4. **A limit hit (30 s):** `python run.py --task fixture_repo --max-tokens 3000`. A red **STOPPED: run tokens**, with the finished work still returned.
+4. **A limit hit (30 s):** `python run.py --task fixture_repo --max-tokens 3000`. A red **STOPPED: run tokens**: the lead finishes, and the missing list shows each specialist stopped by the run's token limit. Any work already finished would be kept.
 5. **The risky write being denied (30 s):** `pytest -k risky_write -v`. It shows that writing in the sandbox works, but writing into the task folder triggers **APPROVAL NEEDED**; no answer means **DENIED**, and the file isn't created. Optionally run `pytest -k injection -v`.
 6. **Honest result (30 s):** show the table from section 3. On tasks this small, one agent was as good, faster and cheaper.

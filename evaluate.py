@@ -9,7 +9,6 @@ from harness import baseline, config, orchestrator
 from run import load_task
 
 CATEGORIES = {"support", "bug", "feature", "spam"}
-PAUSE_SECONDS = 10
 
 
 # Collapse whitespace so a snippet still matches if the model changed indentation.
@@ -92,7 +91,7 @@ def usage(run_id: str) -> dict:
 # Run every task in both modes, then write results.md.
 async def main() -> None:
     rows = []
-    for task_id in ("fixture_repo", "public_repo", "triage_inbox"):
+    for task_id in [t["id"] for t in json.loads(config.TASKS_FILE.read_text(encoding="utf-8"))]:
         task = load_task(task_id)
         for mode in ("multi", "single"):
             print(f"running {task_id} {mode} ...", flush=True)
@@ -100,7 +99,7 @@ async def main() -> None:
             rows.append({"task": task_id, "mode": mode, "status": report.status, "run_id": report.run_id,
                          "findings": len(report.findings), **score(task, report), **usage(report.run_id)})
             print(f"  {report.status}, {len(report.findings)} findings", flush=True)
-            await asyncio.sleep(PAUSE_SECONDS)
+            await asyncio.sleep(config.EVAL_PAUSE_SECONDS)
 
     # One table row per run. A None score is a manual check, shown as "manual".
     num = lambda v, d=1: "manual" if v is None else f"{v:.{d}f}"

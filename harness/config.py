@@ -26,6 +26,7 @@ if (ROOT / ".env").exists():
 
 # Rate limit care: free tier allows about 1 request per second.
 MIN_SECONDS_BETWEEN_CALLS = 1.1
+EVAL_PAUSE_SECONDS = 10  # evaluate.py waits this long between runs
 LLM_TIMEOUT_SECONDS = 60
 
 # Budgets for the whole run and for each single agent.

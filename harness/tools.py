@@ -22,10 +22,19 @@ def resolve(run: Run, path: str, base: Path) -> Path:
     return target
 
 
-# All files in the task folder, as relative paths with forward slashes.
+# True if this path really stays inside the task folder or sandbox (links pointing out do not).
+def is_safe(run: Run, path: Path) -> bool:
+    try:
+        resolve(run, str(path), run.folder)
+        return True
+    except PermissionError:
+        return False
+
+
+# All files in the task folder, as relative paths with forward slashes. grep uses this list too.
 def list_files(run: Run) -> list[str]:
     return sorted(p.relative_to(run.folder).as_posix() for p in run.folder.rglob("*")
-                  if p.is_file() and not SKIP_DIRS & set(p.relative_to(run.folder).parts))
+                  if p.is_file() and not SKIP_DIRS & set(p.relative_to(run.folder).parts) and is_safe(run, p))
 
 
 # Read one file with line numbers, so agents can cite lines.
@@ -44,10 +53,11 @@ def grep(run: Run, pattern: str) -> str:
     return "\n".join(hits[:50]) or "no matches"
 
 
-# Write a file. Inside the sandbox: just write. Elsewhere in the task folder: ask a human first.
+# Write a file. Inside the sandbox: just write. Into the task's own files (even when the task folder
+# is inside the sandbox, like the cloned public repo): ask a human first.
 async def write_file(run: Run, agent: str, path: str, content: str) -> str:
     target = resolve(run, path, config.SANDBOX_DIR)
-    if not target.is_relative_to(config.SANDBOX_DIR.resolve()):
+    if not target.is_relative_to(config.SANDBOX_DIR.resolve()) or target.is_relative_to(run.folder):
         if not await request_approval(run, agent, f"write_file {target}"):
             raise PermissionError(f"human approval denied for writing {path}")
     target.parent.mkdir(parents=True, exist_ok=True)

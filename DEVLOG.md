@@ -11,7 +11,7 @@ Honest log of real bugs, failed runs and wrong assumptions: what happened, what 
 
 ### 1. Model not in the free tier (run `20261016-214739-fixture_repo-multi`)
 - **What happened:** every call to `mistral-large-2512` returned HTTP 403 `tier_not_allowed`. The model is not even in this account's `/v1/models` list.
-- **What the harness did:** the lead failed, so it used the default plan. Each specialist failed and the run ended `PARTIAL` with all three listed as missing. There was no crash. But it retried the 403 three times per agent: 16 calls and 25 s spent on an error that can never succeed.
+- **What the harness did:** the lead failed, so it used the default plan. Each specialist failed and the run ended `PARTIAL` with all three listed as missing. There was no crash. But it retried the 403 three times per agent: 16 calls and about 23 s spent on an error that can never succeed.
 - **What we changed:** switched `MODEL` to the spec's backup, `codestral-2508` (one config line). `with_retries` now fails at once on permanent HTTP 4xx errors and only retries 408, 429 and other transient errors. Test: `test_permanent_api_error_not_retried`.
 
 ### 2. Lead reply was valid JSON with the wrong shape
@@ -61,3 +61,19 @@ Honest log of real bugs, failed runs and wrong assumptions: what happened, what 
 - I added an ignore rule to `.gitignore` to keep only 4 example traces, but the files were already tracked, so nothing changed. `git ls-files` showed it, and the fix was `git rm --cached`.
 - I wrote the lead prompt as "The final answer is {...}", which caused entry 2 above.
 - I skipped two of the spec's required tests (`test_invalid_json_reasked_once`, `test_new_profile_runs_without_core_changes`) and only noticed while writing the README, which cited one of them. Added both, and checked each one fails when the behaviour is broken (re-ask disabled; profile hardcoded to `code_review`).
+
+## Phase 10: reviewer subagent against Section 12 (2026-10-17)
+
+An independent reviewer subagent checked the project. Everything below was confirmed in the code before fixing, and each behaviour fix has a test that failed first.
+
+- **A budget hit was hidden behind COMPLETE.** In 3 of the 4 real fixture team runs, `docs` used up its own 15 steps during a revision. The run still said COMPLETE, and no error event appeared in the trace. **Fix:** every failed subtask now logs an `error` event. Work that finished but was stopped before the checker accepted it is listed under missing, so the run is PARTIAL. Test: `test_agent_budget_hit_on_revision_is_partial`. The headline fixture team run in `results.md` would now be PARTIAL; its scores are unchanged.
+- **Sandbox escape through `grep` and `list_files`.** `read_file` checked paths, but `grep` and `list_files` followed a directory junction out of the task folder. The reviewer read `TOP SECRET` from outside the folder, without admin rights. **Fix:** `list_files` drops any path that resolves outside the task folder or sandbox, and `grep` searches only that list. Test: `test_link_out_of_task_folder_not_followed`.
+- **The public repo could be changed without approval.** It is cloned inside `sandbox/`, so writes to it counted as safe sandbox writes. **Fix:** writing into the task's own folder always needs approval. Test: `test_write_into_task_folder_inside_sandbox_needs_approval`.
+- **Switching provider broke cost estimates.** A model missing from `PRICES` raised a KeyError on every call, so every agent failed. **Fix:** a missing model counts as $0.
+- **Retries were stacked.** A 429 was retried 3 times in `llm.py` and then again in `with_retries`, so one call could be tried up to 16 times. **Fix:** `with_retries` treats 429 as final, since `llm.py` already backed off.
+- **The checker's input was not wrapped.** The findings it checks quote file text but weren't marked as untrusted data. **Fix:** they are now wrapped in `<untrusted_data>`.
+- **Settings outside config, and README numbers.** The evaluation pause moved to config, and `evaluate.py` now reads the task list from `tasks.json`. I had rounded the README's speed and token ratios (it said "2 to 4 times faster" and "3 to 5 times cheaper"); the traces say 1.7 to 4.3 and 1.6 to 5.4. The "25 s" claim was 23 s. All corrected.
+- **Not fixed (known limits):**
+  - After an approval times out, its `input()` thread lingers and could take the answer meant for the next prompt.
+  - A slow regex in `grep` blocks the event loop.
+  - `--strict-checker` still reports COMPLETE, because the spec says to accept work marked "unverified" once the loop cap is hit.

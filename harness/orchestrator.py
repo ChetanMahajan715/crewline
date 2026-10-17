@@ -2,6 +2,7 @@
 # accepts or sends work back, and the results are merged into one FinalReport labelled
 # COMPLETE, PARTIAL or STOPPED. Roles, prompts and tools come from the task profile in config.
 import asyncio
+from collections.abc import Awaitable, Callable
 
 from harness import config, tools
 from harness.agents import run_agent
@@ -18,7 +19,7 @@ def system_prompt(role: str, allowed: list[str], instructions: str) -> str:
 
 
 # Try `attempt` with a timeout; on failure wait 1 s, 2 s, 4 s and try again. Budgets are not retried.
-async def with_retries(run: Run, name: str, attempt):
+async def with_retries(run: Run, name: str, attempt: Callable[[], Awaitable]):
     delays = config.BACKOFF_SECONDS
     for number in range(len(delays) + 1):
         try:
@@ -27,8 +28,9 @@ async def with_retries(run: Run, name: str, attempt):
             raise
         except Exception as error:
             reason = f"{type(error).__name__}: {error}"
-            # HTTP 4xx errors (except 408 timeout, 429 rate limit) are permanent: fail at once.
-            permanent = 400 <= getattr(error, "status_code", 0) < 500 and error.status_code not in (408, 429)
+            # HTTP 4xx errors are permanent: fail at once. 408 (timeout) is retried; 429 (rate limit)
+            # was already retried with backoff inside llm.py, so it is not retried a second time here.
+            permanent = 400 <= getattr(error, "status_code", 0) < 500 and error.status_code != 408
             if number == len(delays) or permanent:
                 run.log(name, "error", status="error", output=f"gave up after {number + 1} attempts: {reason}")
                 raise
@@ -74,7 +76,8 @@ async def run_task(task: dict, strict_checker: bool = False, fail_agent: str | N
             result = await with_retries(run, subtask.role, specialist_attempt)
             result.subtask_id, result.status = subtask.id, "unverified"  # unverified until the checker accepts
             done[subtask.id] = result
-            check = f"Subtask: {subtask.instructions}\nFindings to check:\n{result.model_dump_json()}"
+            # Findings quote file text, so the checker gets them as untrusted data too.
+            check = f"Subtask: {subtask.instructions}\nFindings to check:\n{tools.wrap('findings', result.model_dump_json())}"
             verdict = await with_retries(run, checker, lambda: run_agent(
                 run, checker, checker_system, check, profile["checker_tools"], [run_budget, checker_budget], CheckerVerdict))
             if strict_checker:  # test flag: the checker rejects everything
@@ -113,6 +116,7 @@ async def run_task(task: dict, strict_checker: bool = False, fail_agent: str | N
                 stopped = outcome.limit
             if isinstance(outcome, BaseException):
                 reasons[subtask.id] = f"{type(outcome).__name__}: {outcome}"
+                run.log(subtask.role, "error", status="error", output=f"subtask stopped: {reasons[subtask.id]}")
                 finished = done.get(subtask.id)
                 run.save_subtask(subtask.id, subtask.role, "unverified" if finished else "failed", 0,
                                  finished.model_dump_json() if finished else reasons[subtask.id])
@@ -124,7 +128,9 @@ async def run_task(task: dict, strict_checker: bool = False, fail_agent: str | N
     # 3. Merge what finished and label the run honestly.
     if stopped:
         run.log("harness", "budget_stop", status="error", output=stopped)
+    # Missing = never finished, or finished but stopped before the checker accepted it.
     missing = [f"{role}: {reasons.get(role, 'not started, run stopped')}" for role in roles if role not in done]
+    missing += [f"{role}: work kept but unverified ({reasons[role]})" for role in roles if role in done and role in reasons]
     status = f"STOPPED: {stopped}" if stopped else "PARTIAL" if missing else "COMPLETE"
     report = FinalReport(run_id=run.run_id, status=status, findings=merge(list(done.values())),
                          missing=missing, notes=run.notes)

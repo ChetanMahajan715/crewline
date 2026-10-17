@@ -11,6 +11,8 @@ Model `codestral-2508` for every agent. Cost is **estimated at paid prices**; th
 | triage_inbox | multi | COMPLETE | 3.0 | 3.6 | 2.0 | 1.0 | 9.6 | 21 | 61 | 53 | 59253 | 0.0196 | `20261016-220511-triage_inbox-multi` | 18/20 labels right, 0 invalid snippets |
 | triage_inbox | single | COMPLETE | 3.0 | 4.0 | 2.0 | 1.0 | 10.0 | 30 | 30 | 12 | 14773 | 0.0060 | `20261016-220622-triage_inbox-single` | 20/20 labels right, 0 invalid snippets |
 
+**Status note (added in phase 10):** in `20261016-220223-fixture_repo-multi`, `docs` ran out of its own 15-step budget during a revision, so its work was never verified. That run printed COMPLETE; the harness now labels this case PARTIAL. The scores above are unchanged.
+
 ## Manual check: public repo (added by hand after `evaluate.py`; every finding checked against `records.py` and `setup.py` at commit `ea42736`)
 
 | mode | findings | correct | accuracy (manual, /4) | notes |

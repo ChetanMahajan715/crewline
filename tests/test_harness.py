@@ -236,3 +236,36 @@ async def test_new_profile_runs_without_core_changes(monkeypatch):
     report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent, profile="copy_review"))
     assert report.status == "COMPLETE" and report.findings[0].label == "rude"
     assert {"translator", "tone", "checker:tone"} <= {e["agent"] for e in trace(report)}
+
+
+# A link inside the task folder that points outside it is not listed or searched (sandbox escape).
+async def test_link_out_of_task_folder_not_followed(isolated):
+    import _winapi
+    from harness import orchestrator
+    outside = isolated / "outside_dir"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("TOP SECRET", encoding="utf-8")
+    task = make_task(isolated)
+    _winapi.CreateJunction(str(outside), str(isolated / "repo" / "link"))  # no admin rights needed
+    llm.MOCK_SCRIPT["security"] = [{"tool": "grep", "args": {"pattern": "TOP SECRET"}}]
+    report = await orchestrator.run_task(task)
+    assert not any("TOP SECRET" in (e["output"] or "") for e in trace(report) if e["tool"] == "grep")
+
+
+# The task folder itself is not writable without approval, even when it sits inside sandbox/.
+async def test_write_into_task_folder_inside_sandbox_needs_approval():
+    from harness import orchestrator
+    task = make_task(config.SANDBOX_DIR)  # task folder = sandbox/repo, like the cloned public repo
+    llm.MOCK_SCRIPT["docs"] = [{"tool": "write_file", "args": {"path": "repo/app.py", "content": "changed"}}]
+    report = await orchestrator.run_task(task)
+    assert (config.SANDBOX_DIR / "repo" / "app.py").read_text(encoding="utf-8") == "password = 'hunter2'\n"
+    assert any(e["event_type"] == "approval" and e["status"] == "denied" for e in trace(report))
+
+
+# A specialist that runs out of its own budget during a revision makes the run PARTIAL, logged as an error.
+async def test_agent_budget_hit_on_revision_is_partial(monkeypatch):
+    from harness import orchestrator
+    monkeypatch.setitem(config.AGENT_LIMITS, "max_steps", 2)
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent), strict_checker=True)
+    assert report.status == "PARTIAL" and any("security steps" in m for m in report.missing)
+    assert any(e["event_type"] == "error" and e["agent"] == "security" for e in trace(report))
