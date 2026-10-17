@@ -13,3 +13,4 @@ runs/*.jsonl
 !runs/20261016-220403-public_repo-multi.jsonl
 !runs/20261016-220443-public_repo-single.jsonl
 !runs/20261016-220622-triage_inbox-single.jsonl
+*.docx
