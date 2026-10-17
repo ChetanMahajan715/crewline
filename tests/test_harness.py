@@ -211,3 +211,28 @@ async def test_baseline_single_agent_uses_union_of_tools():
     report = await baseline.run_single(make_task(config.SANDBOX_DIR.parent))
     assert report.status == "COMPLETE" and report.run_id.endswith("-single") and len(report.findings) == 1
     assert not [e for e in trace(report) if e["event_type"] == "tool_denied"]
+
+
+# Invalid JSON is re-asked once with the error; a second bad reply in a row is a failure.
+async def test_invalid_json_reasked_once():
+    from harness import orchestrator
+    llm.MOCK_SCRIPT["security"] = ["not json", {"final": {"findings": [FINDING]}}]
+    llm.MOCK_SCRIPT["quality"] = ["not json", "still not json"] * 4  # every attempt fails twice
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent))
+    events = trace(report)
+    assert "Invalid reply" in [e for e in events if e["agent"] == "security" and e["event_type"] == "llm_step"][1]["input"]
+    assert report.findings[0].title == "Hardcoded password"
+    assert report.status == "PARTIAL" and "invalid JSON twice" in report.missing[0]
+
+
+# A brand-new task type is only config: a new profile with new roles runs through the same core code.
+async def test_new_profile_runs_without_core_changes(monkeypatch):
+    from harness import orchestrator
+    profile = {"lead_tools": ["list_files"], "checker_tools": ["read_file"], "specialists": {
+        "translator": {"tools": ["read_file"], "prompt": "Find untranslated text."},
+        "tone": {"tools": ["read_file"], "prompt": "Find rude wording."}}}
+    monkeypatch.setitem(config.PROFILES, "copy_review", profile)
+    llm.MOCK_SCRIPT["tone"] = [{"final": {"findings": [{**FINDING, "label": "rude"}]}}]
+    report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent, profile="copy_review"))
+    assert report.status == "COMPLETE" and report.findings[0].label == "rude"
+    assert {"translator", "tone", "checker:tone"} <= {e["agent"] for e in trace(report)}
