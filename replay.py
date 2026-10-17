@@ -50,4 +50,7 @@ def replay(path: Path) -> None:
 
 
 if __name__ == "__main__":
+    # Needs exactly one trace file; otherwise explain how to call it.
+    if len(sys.argv) != 2 or not Path(sys.argv[1]).is_file():
+        raise SystemExit("Usage: python replay.py runs\\<run id>.jsonl  (the id is printed at the end of every run)")
     replay(Path(sys.argv[1]))
