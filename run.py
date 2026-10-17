@@ -9,7 +9,7 @@ import subprocess
 from rich.console import Console
 from rich.table import Table
 
-from harness import config, orchestrator
+from harness import baseline, config, orchestrator
 
 STATUS_COLOURS = {"COMPLETE": "green", "PARTIAL": "yellow", "STOPPED": "red"}
 console = Console()
@@ -59,8 +59,11 @@ def main() -> None:
     limits = {k: v for k, v in {"max_seconds": args.max_seconds, "max_tokens": args.max_tokens,
                                 "max_steps": args.max_steps}.items() if v is not None}
     task = load_task(args.task)
-    report = asyncio.run(orchestrator.run_task(task, strict_checker=args.strict_checker,
-                                               fail_agent=args.fail_agent, slow_agent=args.slow_agent, limits=limits))
+    if args.single:
+        report = asyncio.run(baseline.run_single(task, limits=limits))
+    else:
+        report = asyncio.run(orchestrator.run_task(task, strict_checker=args.strict_checker,
+                                                   fail_agent=args.fail_agent, slow_agent=args.slow_agent, limits=limits))
     show(report)
 
 

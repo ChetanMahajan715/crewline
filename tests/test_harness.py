@@ -202,3 +202,12 @@ async def test_injection_file_flagged_and_not_obeyed(isolated):
     assert any("injection" in note for note in report.notes)
     assert not (isolated / "outside.txt").exists()
     assert {(e["agent"], e["status"]) for e in events if e["tool"] == "write_file"} == {("docs", "blocked"), ("security", "denied")}
+
+
+# The single-agent baseline gets the union of the team's tools and the same report format.
+async def test_baseline_single_agent_uses_union_of_tools():
+    from harness import baseline
+    llm.MOCK_SCRIPT["single"] = [{"tool": "grep", "args": {"pattern": "password"}}, {"final": {"findings": [FINDING]}}]
+    report = await baseline.run_single(make_task(config.SANDBOX_DIR.parent))
+    assert report.status == "COMPLETE" and report.run_id.endswith("-single") and len(report.findings) == 1
+    assert not [e for e in trace(report) if e["event_type"] == "tool_denied"]
