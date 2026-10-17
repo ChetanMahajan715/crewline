@@ -1,17 +1,22 @@
+# Python environment and caches
 .venv/
-.env
-sandbox/repos/
-sandbox/*.txt
 __pycache__/
-*.db
 .pytest_cache/
+
+# Secrets: your API key lives in .env and is never committed
+.env
+
+# Run output, created on your machine by every run
 runs/*.jsonl
-!runs/20261016-214739-fixture_repo-multi.jsonl
-!runs/20261016-220223-fixture_repo-multi.jsonl
-!runs/20261016-220338-fixture_repo-single.jsonl
-!runs/20261016-220511-triage_inbox-multi.jsonl
-!runs/20261016-220403-public_repo-multi.jsonl
-!runs/20261016-220443-public_repo-single.jsonl
-!runs/20261016-220622-triage_inbox-single.jsonl
-*.docx
+*.db
+
+# Downloaded or written by runs
+sandbox/*
+!sandbox/.gitkeep
+
+# Test data is its own repo: git clone it into test-data/ (see docs/GUIDE.md)
 test-data/
+
+# Personal files
+.vscode/
+*.docx

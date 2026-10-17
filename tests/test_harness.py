@@ -269,3 +269,53 @@ async def test_agent_budget_hit_on_revision_is_partial(monkeypatch):
     report = await orchestrator.run_task(make_task(config.SANDBOX_DIR.parent), strict_checker=True)
     assert report.status == "PARTIAL" and any("security steps" in m for m in report.missing)
     assert any(e["event_type"] == "error" and e["agent"] == "security" for e in trace(report))
+
+
+# A wrong task name stops with a clear message that lists the real task names.
+def test_unknown_task_gives_clear_message(isolated, monkeypatch):
+    import run
+    tasks = isolated / "tasks.json"
+    tasks.write_text('[{"id": "real", "profile": "code_review", "folder": "x", "goal": "g"}]', encoding="utf-8")
+    monkeypatch.setattr(config, "TASKS_FILE", tasks)
+    with pytest.raises(SystemExit, match="Unknown task 'nope'. Available tasks: real"):
+        run.load_task("nope")
+
+
+# A missing or empty task folder stops with a clear message instead of a silent empty COMPLETE.
+def test_missing_task_folder_gives_clear_message(isolated, monkeypatch):
+    import run
+    tasks = isolated / "tasks.json"
+    tasks.write_text(json.dumps([{"id": "t", "profile": "code_review", "folder": str(isolated / "gone"), "goal": "g"}]),
+                     encoding="utf-8")
+    monkeypatch.setattr(config, "TASKS_FILE", tasks)
+    with pytest.raises(SystemExit, match="missing or empty"):
+        run.load_task("t")
+
+
+# With no keyboard input at all, the terminal approval denies quietly (no crash in the prompt thread).
+def test_terminal_approval_without_input_denies_quietly(monkeypatch):
+    import builtins
+    import threading
+    from harness import tools
+    crashes = []
+
+    # Behaves like input() when the keyboard stream is closed.
+    def closed_input(prompt: str) -> str:
+        raise EOFError
+
+    monkeypatch.setattr(threading, "excepthook", crashes.append)
+    monkeypatch.setattr(tools.sys.stdin, "isatty", lambda: True, raising=False)
+    monkeypatch.setattr(builtins, "input", closed_input)
+    monkeypatch.setattr(config, "APPROVAL_TIMEOUT_SECONDS", 1)
+    assert tools.ask_terminal("write x") is False and crashes == []
+
+
+# A real-model run without an API key stops at once with a clear message (no pointless retries).
+def test_missing_api_key_gives_clear_message(monkeypatch):
+    import run
+    monkeypatch.setattr(config, "PROVIDER", "mistral")
+    monkeypatch.delenv(config.API_KEY_ENV, raising=False)
+    with pytest.raises(SystemExit, match="No API key"):
+        run.check_api_key()
+    monkeypatch.setattr(config, "PROVIDER", "mock")
+    run.check_api_key()  # the mock needs no key

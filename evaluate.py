@@ -6,7 +6,7 @@ import json
 import re
 
 from harness import baseline, config, orchestrator
-from run import load_task
+from run import check_api_key, load_task
 
 CATEGORIES = {"support", "bug", "feature", "spam"}
 
@@ -50,9 +50,8 @@ def score_fixture(findings: list, answers: dict) -> tuple[float, float, float, s
 # a category; priority = severity of its "priority" finding, or else of that category finding.
 def score_triage(findings: list, answers: dict) -> tuple[float, float, float, str]:
     truth = answers["files"]
-    right, invented = 0, 0
     true_high = [name for name, t in truth.items() if t["priority"] == "high"]
-    high_hit = 0
+    right, high_hit = 0, 0
     for name, t in truth.items():
         mine = [f for f in findings if f.file == name]
         category = next((f for f in mine if f.label.lower() in CATEGORIES), None)
@@ -79,6 +78,11 @@ def score(task: dict, report) -> dict:
             "detail": f"{detail}, {invalid} invalid snippets"}
 
 
+# Format one score for the table. None means it was checked by hand, shown as "manual".
+def num(value: float | None) -> str:
+    return "manual" if value is None else f"{value:.1f}"
+
+
 # Time, tokens and estimated cost come from the run's own trace.
 def usage(run_id: str) -> dict:
     events = [json.loads(line) for line in (config.RUNS_DIR / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -90,6 +94,7 @@ def usage(run_id: str) -> dict:
 
 # Run every task in both modes, then write results.md.
 async def main() -> None:
+    check_api_key()
     rows = []
     for task_id in [t["id"] for t in json.loads(config.TASKS_FILE.read_text(encoding="utf-8"))]:
         task = load_task(task_id)
@@ -101,8 +106,6 @@ async def main() -> None:
             print(f"  {report.status}, {len(report.findings)} findings", flush=True)
             await asyncio.sleep(config.EVAL_PAUSE_SECONDS)
 
-    # One table row per run. A None score is a manual check, shown as "manual".
-    num = lambda v, d=1: "manual" if v is None else f"{v:.{d}f}"
     lines = [f"# Results\n\nModel `{config.MODEL}` for every agent. Cost is **estimated at paid prices**; "
              "the free tier cost $0.\n",
              "| task | mode | status | evidence /3 | accuracy /4 | false pos. /2 | priority /1 | total /10 | "

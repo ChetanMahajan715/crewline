@@ -88,7 +88,15 @@ def ask_terminal(question: str) -> bool:
         return False
     answer = []
     prompt = f"\n\033[36mAPPROVAL NEEDED\033[0m {question}\nApprove? [y/N] ({config.APPROVAL_TIMEOUT_SECONDS}s): "
-    thread = threading.Thread(target=lambda: answer.append(input(prompt)), daemon=True)
+
+    # Read one line; if input is closed (EOFError), simply give no answer, which means deny.
+    def read_answer() -> None:
+        try:
+            answer.append(input(prompt))
+        except EOFError:
+            pass
+
+    thread = threading.Thread(target=read_answer, daemon=True)
     thread.start()
     thread.join(config.APPROVAL_TIMEOUT_SECONDS)
     return bool(answer) and answer[0].strip().lower() == "y"

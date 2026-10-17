@@ -4,6 +4,7 @@
 import argparse
 import asyncio
 import json
+import os
 import subprocess
 
 from rich.console import Console
@@ -16,13 +17,26 @@ console = Console()
 
 
 # Find a task by id. If it names a public repo, the harness (not an agent) clones it first.
+# A wrong id or an empty folder stops with a clear message instead of a confusing result.
 def load_task(task_id: str) -> dict:
-    task = next(t for t in json.loads(config.TASKS_FILE.read_text(encoding="utf-8")) if t["id"] == task_id)
+    tasks = {t["id"]: t for t in json.loads(config.TASKS_FILE.read_text(encoding="utf-8"))}
+    if task_id not in tasks:
+        raise SystemExit(f"Unknown task '{task_id}'. Available tasks: {', '.join(tasks)}")
+    task = tasks[task_id]
     folder = config.ROOT / task["folder"]
     if "clone_url" in task and not folder.exists():
         subprocess.run(["git", "clone", "--quiet", task["clone_url"], str(folder)], check=True)
         subprocess.run(["git", "-C", str(folder), "checkout", "--quiet", task["commit"]], check=True)
+    if not folder.is_dir() or not any(folder.iterdir()):
+        raise SystemExit(f"Task folder {folder} is missing or empty. Get the test data first: see docs/GUIDE.md, step 2.")
     return task
+
+
+# A real-model run needs an API key. Stop at once with a clear message instead of failing every call.
+def check_api_key() -> None:
+    if config.PROVIDER != "mock" and not os.environ.get(config.API_KEY_ENV):
+        raise SystemExit(f"No API key: set {config.API_KEY_ENV} in the .env file (see docs/GUIDE.md, step 1.4), "
+                         "or add --provider mock to run offline.")
 
 
 # Print the report: status word in its brand colour, then a findings table, missing work and notes.
@@ -56,6 +70,7 @@ def main() -> None:
     parser.add_argument("--single", action="store_true", help="run the single-agent baseline instead")
     args = parser.parse_args()
     config.PROVIDER = args.provider
+    check_api_key()
     limits = {k: v for k, v in {"max_seconds": args.max_seconds, "max_tokens": args.max_tokens,
                                 "max_steps": args.max_steps}.items() if v is not None}
     task = load_task(args.task)
