@@ -1,3 +1,0 @@
-Subject: Export reports to CSV
-
-Our team builds a weekly report by copying tables by hand. A CSV export button would save us an hour each week.
