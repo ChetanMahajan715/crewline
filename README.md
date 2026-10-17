@@ -83,7 +83,7 @@ agent-harness/
 ├── app.py                web page: run viewer and approval screen (Streamlit)
 ├── tasks/tasks.json      the list of tasks (id, team, folder, goal)
 ├── tests/                25 automated tests (offline mock model)
-├── docs/                 GUIDE.md (how to run and test) and DEVLOG.md (what went wrong)
+├── docs/                 GUIDE.md (run and test), VIDEO_SCRIPT.md (demo), DEVLOG.md (what went wrong)
 ├── brand/                logo, colours and the web page theme
 ├── sandbox/              your task inputs, and the only folder agents may write to
 └── runs/                 one trace file per run (created by runs)
@@ -199,6 +199,8 @@ On these tasks, almost nowhere. The single agent matched or beat the team on qua
 `TODO: fill in`
 
 ## 11. Demo video script (3 to 4 min)
+
+The full scene-by-scene script, with folders, commands and narration, is in [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md). In short:
 
 1. **Title card (10 s):** logo, "agent-harness", "A team of agents, kept in check." on `#0F172A`.
 2. **A full real run (60 s):** with a trap `NOTES.md` planted in your repo ([docs/GUIDE.md](docs/GUIDE.md) part 4), run `python run.py --task myrepo`. Point out:
