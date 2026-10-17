@@ -1,1 +1,6 @@
-[]
+[
+  {"id": "myrepo", "profile": "code_review", "folder": "sandbox/test-data/buggy_python_repo",
+   "goal": "Review this Python repo for security, quality and documentation issues."},
+  {"id": "inbox", "profile": "file_triage", "folder": "sandbox/test-data/support_inbox",
+   "goal": "Triage every message in this inbox: category, priority and key facts."}
+]

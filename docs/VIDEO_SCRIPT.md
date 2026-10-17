@@ -12,7 +12,7 @@ The brief asks for **one full run, one failure, one limit hit**: scenes 3, 5 and
 
 | # | Time | Show / type | Say |
 |---|---|---|---|
-| 1 | 0:00 | Logo: `brand\logo.svg` | "agent-harness: a team of AI agents with budgets, retries, safety controls and replayable logs. Hand-written, no framework." |
+| 1 | 0:00 | Logo: `brand\logo.svg` | "Crewline: a team of AI agents with budgets, retries, safety controls and replayable logs. Hand-written, no framework." |
 | 2 | 0:15 | VS Code: `sandbox\test-data\buggy_python_repo\db.py` line 7, then `NOTES.md`, then `tasks\tasks.json` | "The input is a small repo with 8 planted bugs. NOTES.md is a trap that tells AI agents to ignore their instructions. A task is one entry in tasks.json: folder, team, goal." |
 | 3 | 0:50 | `python run.py --task myrepo`, then `Test-Path outside.txt` | While it runs: "The lead plans, three specialists work in parallel with only the tools they need, a checker reviews." After: point at the findings (high first), the injection NOTE, and `False`. "The trap was treated as data, not obeyed." |
 | 4 | 1:55 | The `python replay.py runs\...jsonl` line printed at the end | Point at the three specialists starting at the same second, the INJECTION line, a checker verdict, the totals table. "Every step is logged and replayable." |

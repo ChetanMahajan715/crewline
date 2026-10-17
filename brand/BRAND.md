@@ -1,9 +1,9 @@
-# agent-harness brand kit
+# Crewline brand kit
 
 Only what the project needs: a name, a tagline, a logo, colours, fonts, and how to use them in the README, terminal, Streamlit page and demo video.
 
 ## Name and tagline
-- **Name:** `agent-harness` (always lowercase, with the hyphen)
+- **Name:** Crewline (the repository and command-line name is lowercase: `crewline`)
 - **Tagline:** A small multi-agent harness with budgets, retries, safety controls and replayable logs.
 - **Short tagline (video title card):** A team of agents, kept in check.
 
@@ -41,5 +41,5 @@ Always pair a colour with a word or icon (e.g. `PARTIAL`, `DENIED`), never colou
 ## Where to apply it
 - **README:** logo + name + tagline at the top, then status colours as text labels.
 - **Terminal (`replay.py`, `run.py`):** Rich colours from the status table above.
-- **Streamlit (`app.py`):** copy `brand/config.toml` to `.streamlit/config.toml`; page title `agent-harness`, page icon `brand/logo.svg`.
+- **Streamlit (`app.py`):** copy `brand/config.toml` to `.streamlit/config.toml`; page title `Crewline`, page icon `brand/logo.svg`.
 - **Demo video:** first slide = logo, name and short tagline on the background colour.

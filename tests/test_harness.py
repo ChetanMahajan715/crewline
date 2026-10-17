@@ -1,4 +1,4 @@
-# Tests for agent-harness. They use only the mock provider: no network, no API key, fast.
+# Tests for Crewline. They use only the mock provider: no network, no API key, fast.
 # Each test sends files, logs and the database to a temporary folder.
 import json
 

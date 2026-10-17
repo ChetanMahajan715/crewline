@@ -1,4 +1,4 @@
-# Streamlit page for agent-harness: page 1 views a run (timeline, totals per agent, final report),
+# Streamlit page for Crewline: page 1 views a run (timeline, totals per agent, final report),
 # page 2 approves or denies risky actions that a running harness is waiting on.
 # Start with: streamlit run app.py   (and set APPROVAL_MODE = "streamlit" in config to use page 2)
 import json
@@ -10,17 +10,17 @@ import streamlit as st
 from harness import config, state
 
 # Brand: page title and logo from brand/BRAND.md; theme comes from .streamlit/config.toml.
-st.set_page_config(page_title="agent-harness", page_icon=str(config.ROOT / "brand" / "logo.svg"), layout="wide")
+st.set_page_config(page_title="Crewline", page_icon=str(config.ROOT / "brand" / "logo.svg"), layout="wide")
 STATUS_WORDS = {"ok": "🟢 OK", "retry": "🟡 RETRY", "rejected": "🟡 REJECTED", "error": "🔴 ERROR",
                 "denied": "🔴 DENIED", "blocked": "🔴 BLOCKED", "injection": "🟣 INJECTION", "approval": "🔵 APPROVAL"}
 
 
 # Page 1: pick a trace file and show what happened.
 def runs_page() -> None:
-    st.title("agent-harness: runs")
+    st.title("Crewline: runs")
     traces = sorted(config.RUNS_DIR.glob("*.jsonl"), reverse=True)
     if not traces:
-        st.info("No runs yet. Add a task (docs/GUIDE.md, part 2), then run: python run.py --task myrepo")
+        st.info("No runs yet. Get the demo data (docs/GUIDE.md, part 2), then run: python run.py --task myrepo")
         return
     path = st.selectbox("Run", traces, format_func=lambda p: p.stem)
     events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
@@ -63,7 +63,7 @@ def runs_page() -> None:
 
 # Page 2: approvals waiting in SQLite. The harness polls the row and continues on a decision.
 def approvals_page() -> None:
-    st.title("agent-harness: approvals")
+    st.title("Crewline: approvals")
     if config.APPROVAL_MODE != "streamlit":
         st.warning('APPROVAL_MODE in harness/config.py is "terminal", so the harness asks in the terminal instead.')
     db = state.connect()

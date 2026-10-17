@@ -1,4 +1,4 @@
-# Command line entry point for agent-harness: run one task from tasks/tasks.json with the team
+# Command line entry point for Crewline: run one task from tasks/tasks.json with the team
 # (or the single-agent baseline) and print the final report. The test flags simulate failures.
 # Example: python run.py --task myrepo --provider mock   (add tasks in tasks/tasks.json first)
 import argparse
@@ -21,7 +21,7 @@ console = Console()
 def load_task(task_id: str) -> dict:
     tasks = {t["id"]: t for t in json.loads(config.TASKS_FILE.read_text(encoding="utf-8"))}
     if not tasks:
-        raise SystemExit("tasks/tasks.json has no tasks yet. Add one first: see docs/GUIDE.md, part 2.")
+        raise SystemExit("tasks/tasks.json has no tasks yet. Add one first: see docs/GUIDE.md, step 5.2.")
     if task_id not in tasks:
         raise SystemExit(f"Unknown task '{task_id}'. Available tasks: {', '.join(tasks)}")
     task = tasks[task_id]
@@ -30,7 +30,7 @@ def load_task(task_id: str) -> dict:
         subprocess.run(["git", "clone", "--quiet", task["clone_url"], str(folder)], check=True)
         subprocess.run(["git", "-C", str(folder), "checkout", "--quiet", task["commit"]], check=True)
     if not folder.is_dir() or not any(folder.iterdir()):
-        raise SystemExit(f"Task folder {folder} is missing or empty. Get the test data first: see docs/GUIDE.md, step 2.")
+        raise SystemExit(f"Task folder {folder} is missing or empty. Get the demo data first: see docs/GUIDE.md, step 2.1.")
     return task
 
 
@@ -59,7 +59,7 @@ def show(report) -> None:
 
 # Read the flags, apply them to config, run the task.
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="agent-harness", description="agent-harness: a small multi-agent "
+    parser = argparse.ArgumentParser(prog="crewline", description="Crewline: a small multi-agent "
                                      "harness with budgets, retries, safety controls and replayable logs.")
     parser.add_argument("--task", required=True, help="task id from tasks/tasks.json")
     parser.add_argument("--provider", choices=["mistral", "mock"], default=config.PROVIDER)

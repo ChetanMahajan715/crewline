@@ -1,37 +1,79 @@
-<p align="center"><img src="brand/logo.svg" width="96" alt="agent-harness logo"></p>
+<p align="center">
+  <img src="brand/logo.svg" width="110" alt="Crewline logo">
+</p>
 
-# agent-harness
+<h1 align="center">Crewline</h1>
 
-A small multi-agent harness with budgets, retries, safety controls and replayable logs.
+<p align="center">
+  <b>A small multi-agent harness with budgets, retries, safety controls and replayable logs.</b><br>
+  A team of agents, kept in check.
+</p>
 
-Give it a folder of files and a job in plain English. A **lead** agent splits the job, three **specialist** agents work on it in parallel, a **checker** agent reviews their work, and the harness merges everything into one report. Around the agents, the harness enforces limits, retries failures, blocks risky actions, and records every step so you can replay the run.
+<p align="center">
+  <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-14B8A6?style=flat-square">
+  <img alt="Tests: 25 passing" src="https://img.shields.io/badge/tests-25%20passing-22C55E?style=flat-square">
+  <img alt="Model: Mistral" src="https://img.shields.io/badge/model-Mistral%20(free%20tier)-F59E0B?style=flat-square">
+  <img alt="No agent framework" src="https://img.shields.io/badge/framework-none%2C%20hand--written-1E293B?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="#try-it-in-5-minutes">Quick start</a> ·
+  <a href="docs/GUIDE.md">Full guide</a> ·
+  <a href="#3-results-team-vs-single-agent">Results</a> ·
+  <a href="https://github.com/ChetanMahajan715/crewline-test-data">Demo data</a> ·
+  <a href="docs/DEVLOG.md">Dev log</a>
+</p>
+
+---
+
+Give Crewline a folder of files and a job in plain English. A **lead** agent splits the job, three **specialist** agents work on it in parallel, a **checker** agent reviews their work, and the harness merges everything into one report. Around the agents, the harness enforces limits, retries failures, blocks risky actions, and records every step so you can replay the run.
+
+## Features
+
+| | |
+|---|---|
+| **Roles** | A lead, three specialists and a checker, each with its own instructions and its own tools. Hand-offs are JSON checked by Pydantic. |
+| **Parallel work** | Specialists run at the same time. Shared state lives in one SQLite file you can inspect. |
+| **Budgets** | Step, time, token and cost limits for the whole run and for each agent. A run that hits one stops cleanly. |
+| **Failure handling** | Timeouts and retries with backoff (1 s, 2 s, 4 s). A failed agent gives a result clearly labelled **PARTIAL**. |
+| **Verification** | The checker can reject work and send it back, at most twice. |
+| **Least privilege** | Each agent gets only the tools it needs. Paths outside the task folder and sandbox are blocked. Risky writes need a human "yes"; no answer means no. |
+| **Untrusted content** | Files are treated as data, never as orders. Text that tries to instruct an agent is flagged. |
+| **Full logs** | Every step is recorded (agent, input, tools, output, tokens, seconds) and can be replayed in the terminal or on a web page. |
+| **Two task types** | Code review and file triage run through the same core code. A new task type is a config entry, not new code. |
 
 Run states, as shown in the terminal: **COMPLETE** (green), **PARTIAL** (yellow), **STOPPED** (red), **INJECTION SUSPECTED** (magenta), **APPROVAL NEEDED** (cyan).
 
-## Quick start (Windows, PowerShell)
+## Try it in 5 minutes
 
-You need [Git](https://git-scm.com/) and [uv](https://docs.astral.sh/uv/). uv installs Python 3.12 for you if it's missing.
+You need [Git](https://git-scm.com/), [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 for you), and a free [Mistral API key](https://console.mistral.ai/). The commands are for Windows PowerShell.
 
 ```powershell
-git clone https://github.com/ChetanMahajan715/agent-harness.git
-cd agent-harness
+# 1. Get Crewline and install it (everything goes into .venv inside the project)
+git clone https://github.com/ChetanMahajan715/crewline.git
+cd crewline
 uv venv .venv --python 3.12
 .venv\Scripts\activate
 uv pip install -r requirements.txt
 
-# Your Mistral API key (free tier works): copy the template, then put the key after the = sign
+# 2. Add your API key: put it after MISTRAL_API_KEY= and save
 copy .env.example .env
 notepad .env
 
-pytest                                   # 25 tests, offline, about 4 seconds
+# 3. Get the demo data (a buggy Python repo and a support inbox, with answer keys)
+git clone https://github.com/ChetanMahajan715/crewline-test-data.git sandbox\test-data
 
-# Bring your own input: clone a small Python repo into the sandbox...
-git clone https://github.com/OWNER/REPO.git sandbox\repos\myrepo
-# ...add it to tasks\tasks.json (see docs/GUIDE.md, part 2), then:
-python run.py --task myrepo              # a real run with the team
+# 4. Run it
+pytest                                   # 25 offline tests, about 4 seconds
+python run.py --task myrepo              # code review of the buggy repo, with the team
+python run.py --task inbox               # triage of 10 support messages
 ```
 
-**The full step-by-step guide**, covering every feature, how to test each one and how to fix common problems, is in **[docs/GUIDE.md](docs/GUIDE.md)**.
+At the end of each run, Crewline prints a `Replay:` command that shows every step. To look at runs in the browser: `streamlit run app.py`.
+
+**Demo data:** [crewline-test-data](https://github.com/ChetanMahajan715/crewline-test-data) holds the inputs and the correct answers: 8 planted bugs, 10 messages with their category and priority, and a trap file in each that tries to give the agents orders. `tasks/tasks.json` already points at it.
+
+**Step-by-step guide:** [docs/GUIDE.md](docs/GUIDE.md) walks through every feature and how to test it, including how to use your own GitHub repo instead of the demo data.
 
 ## 1. What I built
 
@@ -66,7 +108,7 @@ A task type is just a profile in `harness/config.py`.
 ### Project structure
 
 ```
-agent-harness/
+crewline/
 ├── harness/              the harness itself
 │   ├── config.py         ALL settings: model, limits, retries, prices, task profiles
 │   ├── schemas.py        message formats passed between agents (Pydantic)
@@ -85,22 +127,24 @@ agent-harness/
 ├── tests/                25 automated tests (offline mock model)
 ├── docs/                 GUIDE.md (run and test), VIDEO_SCRIPT.md (demo), DEVLOG.md (what went wrong)
 ├── brand/                logo, colours and the web page theme
-├── sandbox/              your task inputs, and the only folder agents may write to
+├── sandbox/              task inputs (the demo data goes here), and the only folder agents may write to
 └── runs/                 one trace file per run (created by runs)
 ```
 
 ## 2. How to run
 
-The project ships with **no tasks**: `tasks/tasks.json` starts as `[]`, and you add your own. A task is a folder plus a job, for example:
+A **task** is a folder plus a job. `tasks/tasks.json` comes with two, using the demo data:
 
 ```json
 [
-  {"id": "myrepo", "profile": "code_review", "folder": "sandbox/repos/myrepo",
-   "goal": "Review this Python repo for security, quality and documentation issues."}
+  {"id": "myrepo", "profile": "code_review", "folder": "sandbox/test-data/buggy_python_repo",
+   "goal": "Review this Python repo for security, quality and documentation issues."},
+  {"id": "inbox", "profile": "file_triage", "folder": "sandbox/test-data/support_inbox",
+   "goal": "Triage every message in this inbox: category, priority and key facts."}
 ]
 ```
 
-`profile` picks the team: `code_review` (security, quality, docs) or `file_triage` (classifier, urgency, extractor, for a folder of text messages). [docs/GUIDE.md](docs/GUIDE.md) parts 2 and 5 walk through both. Then, with `.venv` active:
+`profile` picks the team: `code_review` (security, quality, docs) or `file_triage` (classifier, urgency, extractor). To review **your own repo**, clone it into `sandbox\repos\` and add an entry ([docs/GUIDE.md](docs/GUIDE.md), part 5). Then, with `.venv` active:
 
 ```powershell
 python run.py --task myrepo                        # the team, real model
@@ -202,7 +246,7 @@ On these tasks, almost nowhere. The single agent matched or beat the team on qua
 
 The full scene-by-scene script, with folders, commands and narration, is in [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md). In short:
 
-1. **Title card (10 s):** logo, "agent-harness", "A team of agents, kept in check." on `#0F172A`.
+1. **Title card (10 s):** logo, "Crewline", "A team of agents, kept in check." on `#0F172A`.
 2. **A full real run (60 s):** with a trap `NOTES.md` planted in your repo ([docs/GUIDE.md](docs/GUIDE.md) part 4), run `python run.py --task myrepo`. Point out:
    - the findings table, high severity first;
    - the **INJECTION SUSPECTED** note for `NOTES.md`;

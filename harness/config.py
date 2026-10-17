@@ -1,4 +1,4 @@
-# All settings for agent-harness live in this one file: model, limits, retries, prices,
+# All settings for Crewline live in this one file: model, limits, retries, prices,
 # and the task profiles (roles, prompts, tool permissions). Change a value here and the
 # next run uses it. Other files read these as `config.NAME` so tests can override them.
 import os
