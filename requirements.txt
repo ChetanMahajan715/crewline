@@ -4,7 +4,7 @@ openai==3.31.0
 pydantic==2.14.1
 # Coloured terminal output for run.py and replay.py
 rich==15.0.0
-# Optional web page: trace viewer and approval screen
+# Optional web page: trace viewer and approval screen (also installs pandas, used for its tables)
 streamlit==1.66.0
 # Test runner
 pytest==9.1.1

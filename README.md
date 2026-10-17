@@ -44,6 +44,7 @@ There are two task types, and both run through the same core code. `code_review`
 | `harness/state.py` | SQLite shared state and the JSONL trace |
 | `harness/baseline.py` | The single-agent version for comparison |
 | `run.py` / `replay.py` / `evaluate.py` | Run a task / replay a trace / compare team vs single agent |
+| `app.py` | Streamlit page: run viewer (timeline, totals, report) and the approval screen |
 
 ## 2. How to run (Windows, PowerShell)
 
@@ -60,7 +61,10 @@ python run.py --task triage_inbox --provider mock  # offline, no key needed
 python replay.py runs\20261016-220223-fixture_repo-multi.jsonl
 python evaluate.py                                 # 3 tasks x 2 modes, writes results.md
 pytest                                             # 18 tests, mock provider, about 4 s
+streamlit run app.py                               # optional: run viewer + approval screen
 ```
+
+To approve risky actions in the browser instead of the terminal, set `APPROVAL_MODE = "streamlit"` in `harness/config.py`, keep `streamlit run app.py` open, and use the **Approvals** page. No answer within `APPROVAL_TIMEOUT_SECONDS` still means deny.
 
 **Test flags:** `--fail-agent security` (always errors, then retries, then PARTIAL), `--slow-agent quality` (sleeps past the timeout), `--strict-checker` (rejects everything, shows the loop cap), and `--max-tokens 3000` / `--max-seconds` / `--max-steps` (run limits).
 
@@ -133,7 +137,6 @@ Run `runs/20261016-214739-fixture_repo-multi.jsonl` (try `python replay.py` on i
 - A deterministic evidence pre-check fed to the checker.
 - Automatic scoring for the public repo (it's a manual check instead).
 - A tool or service call other than `write_file` that goes through the approval gate. `request_approval()` is generic, but only `write_file` uses it today.
-- The Streamlit approval screen is optional and built last (see `app.py` if present).
 
 ## 9. Hours spent
 
